@@ -18,7 +18,7 @@ Install `requirements.txt` using
 pip install -r requirements.txt 
 ```
 
-# Dataset Access
+# Dataset and Pre-trained Models Access
 Please download the GTLF_BTP dataset and place it in `dataset/` folder:
 
 https://compvis.site.hw.ac.uk/dataset/
@@ -36,26 +36,32 @@ GTLF_BTP/
 │    └─ MCAR/
 ```
 
-# Paths
+Please download the pre-trained models and place it in `save/` folder:
 
-By default, `config/config.py` reads datasets from `dataset/` inside this package:
+```text
+GTLF_BTP/
+├─ save/
+│  ├─ baseline/
+│  ├─ gtlf/
+```
 
 # Full run
 
 Use the command below for a full run: baseline, fusion, statistical analysis, and visualization.
  
 ```powershell
-python run.py
+python run.py --all
 ```
 
 # Example runs
 ```powershell
-python run.py --all
 python run.py --tasks baseline fusion --baseline-args "--no-cv" --fusion-args "--epochs 50 --no-cv"
 python run.py --tasks stats --baseline-csv "out/run001/eval_per_set.csv" --fusion-csv "out/run002/eval_per_set.csv"
 python run.py --tasks visualization --visualization-args "top3 out/run001 out/run002 --imputation-method CMILK"
 python run.py --tasks visualization --visualization-args "baseline-vs-fused --baseline-summary out/run001 --fuse-summary out/run002 --imputation-method CMILK"
 python run.py --tasks visualization --visualization-args "significance-share out/run002/analysis_vs_run001"
+python run.py --tasks fusion --fusion-args "--save-pretrained"
+python run.py --tasks fusion --eval-only --gtlf-save-dir "save/gtlf"
 ```
 
 # Referencing
