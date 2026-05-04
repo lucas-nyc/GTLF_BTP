@@ -4,8 +4,8 @@ PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_ROOT = os.environ.get("BTP_DATASET_ROOT", os.path.join(PACKAGE_ROOT, "dataset"))
 COMPLETE_ROOT = os.path.join(DATASET_ROOT, "complete")
 
-INPUT_DATA = os.path.join(COMPLETE_ROOT, "all_tbl_manual_annotated_v2_cleaned.csv")
-LANDMARK_COORDS = os.path.join(COMPLETE_ROOT, "landmark_coordinates_all_cases.csv")
+INPUT_DATA = os.path.join(COMPLETE_ROOT, "groundtruth.csv")
+LANDMARK_COORDS = os.path.join(COMPLETE_ROOT, "landmark_coords.csv")
 
 IMPUTED_ROOT = os.path.join(DATASET_ROOT, "imputed")  # contains <method>/MNAR and <method>/MCAR
 IMPUTED_MNAR_DIR = "MNAR"
@@ -21,11 +21,7 @@ BASELINE_SAVE_DIR = os.path.join(SAVE_ROOT, "baseline")
 GTLF_SAVE_DIR = os.path.join(SAVE_ROOT, "gtlf")
 
 # Imputation methods available under IMPUTED_ROOT/<method>/.
-AVAILABLE_IMPUTATION_METHODS = [
-    "CMILK", "KNN_Imputation", "Linear_Interpolation",
-    "Linear_Regression", "Mean_Imputation", "Moving_Mean", "Moving_Median",
-    "GAIN", "MiceForest"
-]
+AVAILABLE_IMPUTATION_METHODS = ["CMILK"]
 
 # Active imputation methods for baseline evaluation.
 IMPUTATION_METHODS = ["CMILK"]
@@ -49,21 +45,10 @@ RUN_WITHOUT_CV = False
 # validation split is supplied to the training routine.
 NO_CV_VAL_RATIO = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
 THRESHOLD = 0.6            # for PCC edge construction
-GPR_THRESHOLD = 0.6        # for GPR edge construction
-GPR_N_RESTARTS = 2
-USE_TQDM = True
-# Guard for unusually large normalized y values used in GPR feature construction.
-# MinMax scaling can exceed [0,1] on out-of-range data; keep strict=False unless debugging.
-GPR_NORM_GUARD_ABS = 20.0
-GPR_NORM_GUARD_STRICT = False
 PATIENCE = 10
 TARGET = 39
 SAVE_RUN_LOG = True
 SAVE_CV_METRICS = True
-
-# GraphSAGE+EGNN temperature feature resolution (must map to a real input column).
-# Data columns are Var1..Var68; this index is 0-based.
-TEMPERATURE_FEATURE_IDX = 0
 
 # Training verbosity
 TRAIN_VERBOSE = True
