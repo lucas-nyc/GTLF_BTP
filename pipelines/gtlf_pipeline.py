@@ -1,10 +1,12 @@
 import argparse
 import copy
+import glob
 import hashlib
 import json
 import os
 import pprint
 import random
+import shutil
 import time
 
 from collections import defaultdict
@@ -830,6 +832,17 @@ def _parse_args(argv=None):
     parser.add_argument("--fused-loss-weight", type=float, default=1.0, help="Weight for the fused target loss.")
     parser.add_argument("--graph-loss-weight", type=float, default=1.0, help="Weight for the graph-branch global reconstruction loss.")
     parser.add_argument("--tabular-loss-weight", type=float, default=1.0, help="Weight for the tabular-branch global reconstruction loss.")
+    parser.add_argument("--eval-only", action="store_true", help="Skip training and evaluate checkpoints from --pretrained-dir.")
+    parser.add_argument(
+        "--pretrained-dir",
+        default=getattr(cfg, "GTLF_SAVE_DIR", os.path.join("save", "gtlf")),
+        help="Directory containing pre-trained GTLF checkpoint subfolders.",
+    )
+    parser.add_argument(
+        "--save-pretrained",
+        action="store_true",
+        help="After training, copy GTLF checkpoints/config into --pretrained-dir.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1001,42 +1014,76 @@ def main(argv=None):
     training_times = {}
     cv_rows = []
 
-    for spec in model_specs:
-        print(f"Training {spec['display']}...")
-        t_train = time.time()
-        res = train_cv_fuse_model(
-            graphs=train_graphs,
-            run_dir=run_dir,
-            model_key=spec["key"],
-            model_display=spec["display"],
-            model_kwargs=spec["kwargs"],
-            n_splits=n_splits,
-            seed=seed,
-            torch_epochs=int(args.epochs),
-            device=device,
-            lr=float(args.lr),
-            weight_decay=float(args.weight_decay),
-            patience=int(args.patience),
-            batch_size=int(args.batch_size),
-            loss_name=str(args.loss),
-            smooth_l1_beta=float(args.smooth_l1_beta),
-            fused_loss_weight=float(spec.get("fused_loss_weight", args.fused_loss_weight)),
-            graph_loss_weight=float(spec.get("graph_loss_weight", args.graph_loss_weight)),
-            tabular_loss_weight=float(spec.get("tabular_loss_weight", args.tabular_loss_weight)),
-            use_cv=(not run_without_cv),
-        )
-        trained[spec["key"]] = res
-        training_times[spec["key"]] = time.time() - t_train
-        for m in (res.get("cv_metrics") or []):
-            cv_rows.append({
-                "Trained_Key": spec["key"],
-                "Method": spec["display"],
-                "Fold": int(m.get("fold")) if m.get("fold") is not None else np.nan,
-                "RMSE": float(m.get("rmse", np.nan)),
-                "MAE": float(m.get("mae", np.nan)),
-                "Best_Objective": float(m.get("best_objective", np.nan)) if m.get("best_objective") is not None else np.nan,
-                "Training_Time": float(training_times.get(spec["key"], np.nan)),
-            })
+    if bool(args.eval_only):
+        pretrained_dir = os.path.abspath(str(args.pretrained_dir))
+        print(f"[INFO] Evaluation only: loading GTLF checkpoints from {pretrained_dir}")
+        for spec in model_specs:
+            model_dir = os.path.join(pretrained_dir, spec["key"])
+            paths = sorted(glob.glob(os.path.join(model_dir, "*.pt")))
+            if not paths:
+                print(f"[WARN] No checkpoints found for {spec['key']} in {model_dir}")
+                continue
+            trained[spec["key"]] = {
+                "type": "graph_scalar_fusion",
+                "models": paths,
+                "paths": paths,
+                "model_name": spec["key"],
+                "display_name": spec["display"],
+                "model_kwargs": dict(spec["kwargs"]),
+                "cv_metrics": [],
+            }
+            training_times[spec["key"]] = np.nan
+            print(f"[INFO] Loaded {len(paths)} checkpoint path(s) for {spec['display']}")
+    else:
+        for spec in model_specs:
+            print(f"Training {spec['display']}...")
+            t_train = time.time()
+            res = train_cv_fuse_model(
+                graphs=train_graphs,
+                run_dir=run_dir,
+                model_key=spec["key"],
+                model_display=spec["display"],
+                model_kwargs=spec["kwargs"],
+                n_splits=n_splits,
+                seed=seed,
+                torch_epochs=int(args.epochs),
+                device=device,
+                lr=float(args.lr),
+                weight_decay=float(args.weight_decay),
+                patience=int(args.patience),
+                batch_size=int(args.batch_size),
+                loss_name=str(args.loss),
+                smooth_l1_beta=float(args.smooth_l1_beta),
+                fused_loss_weight=float(spec.get("fused_loss_weight", args.fused_loss_weight)),
+                graph_loss_weight=float(spec.get("graph_loss_weight", args.graph_loss_weight)),
+                tabular_loss_weight=float(spec.get("tabular_loss_weight", args.tabular_loss_weight)),
+                use_cv=(not run_without_cv),
+            )
+            trained[spec["key"]] = res
+            training_times[spec["key"]] = time.time() - t_train
+            for m in (res.get("cv_metrics") or []):
+                cv_rows.append({
+                    "Trained_Key": spec["key"],
+                    "Method": spec["display"],
+                    "Fold": int(m.get("fold")) if m.get("fold") is not None else np.nan,
+                    "RMSE": float(m.get("rmse", np.nan)),
+                    "MAE": float(m.get("mae", np.nan)),
+                    "Best_Objective": float(m.get("best_objective", np.nan)) if m.get("best_objective") is not None else np.nan,
+                    "Training_Time": float(training_times.get(spec["key"], np.nan)),
+                })
+
+        if bool(args.save_pretrained):
+            pretrained_dir = os.path.abspath(str(args.pretrained_dir))
+            os.makedirs(pretrained_dir, exist_ok=True)
+            shutil.copy2(config_path, os.path.join(pretrained_dir, os.path.basename(config_path)))
+            for spec in model_specs:
+                src_dir = os.path.join(run_dir, spec["key"])
+                dst_dir = os.path.join(pretrained_dir, spec["key"])
+                if os.path.isdir(src_dir):
+                    if os.path.isdir(dst_dir):
+                        shutil.rmtree(dst_dir)
+                    shutil.copytree(src_dir, dst_dir)
+            print(f"[INFO] Saved GTLF pre-trained checkpoints to: {pretrained_dir}")
 
     all_results = []
     processed_impute_counts = defaultdict(int)
