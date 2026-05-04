@@ -6,8 +6,6 @@ COMPLETE_ROOT = os.path.join(DATASET_ROOT, "complete")
 
 INPUT_DATA = os.path.join(COMPLETE_ROOT, "all_tbl_manual_annotated_v2_cleaned.csv")
 LANDMARK_COORDS = os.path.join(COMPLETE_ROOT, "landmark_coordinates_all_cases.csv")
-PCA_LOADINGS = os.path.join(COMPLETE_ROOT, "pca_loadings_train_split.xlsx")
-PCA_TEMP_CSV = os.path.join(COMPLETE_ROOT, "pca_temp.csv")
 
 IMPUTED_ROOT = os.path.join(DATASET_ROOT, "imputed")  # contains <method>/MNAR and <method>/MCAR
 IMPUTED_MNAR_DIR = "MNAR"
@@ -32,7 +30,6 @@ AVAILABLE_IMPUTATION_METHODS = [
 # Active imputation methods for baseline evaluation.
 IMPUTATION_METHODS = ["CMILK"]
 
-# Regex patterns (can modify if your filenames differ)
 MNAR_IMPUTED_REGEX = r"^imputed_dataset_(?:set_)?(?P<idx>\d+)_(?P<scenario>non_occluded|face_mask|glasses)\.csv$"
 MCAR_IMPUTED_REGEX = r"^imputed_dataset_set_(?P<idx>\d+)\.csv$"
 
