@@ -2,6 +2,7 @@ import os
 import time
 import pprint
 import argparse
+import shutil
 import numpy as np
 import pandas as pd
 import torch
@@ -134,6 +135,17 @@ def _parse_cli_flags(argv=None):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--no-cv", action="store_true", help="Run single-split training without K-fold CV.")
     parser.add_argument("--with-cv", action="store_true", help="Force K-fold CV even if config disables it.")
+    parser.add_argument("--eval-only", action="store_true", help="Reserved for pre-trained baseline evaluation.")
+    parser.add_argument(
+        "--pretrained-dir",
+        default=getattr(cfg, "BASELINE_SAVE_DIR", os.path.join("save", "baseline")),
+        help="Directory containing pre-trained baseline checkpoint subfolders.",
+    )
+    parser.add_argument(
+        "--save-pretrained",
+        action="store_true",
+        help="After training, copy baseline checkpoints into --pretrained-dir.",
+    )
     args, _ = parser.parse_known_args(argv)
     return args
 
@@ -259,6 +271,12 @@ def main(argv=None):
         n_splits = int(max(2, min(int(getattr(cfg, "CV_SPLITS", 5)), int(X_train.shape[0]))))
     torch_epochs = int(getattr(cfg, "TORCH_EPOCHS", 80))
     seed = int(getattr(cfg, "RANDOM_SEED", 42))
+    if bool(getattr(cli_flags, "eval_only", False)):
+        raise RuntimeError(
+            "Baseline --eval-only is not available yet because baseline checkpoints "
+            "include mixed vector and graph model formats. Use fusion --eval-only, "
+            "or run baseline training with --save-pretrained to stage checkpoints."
+        )
 
     trained = {}
     training_times = {}
@@ -483,6 +501,21 @@ def main(argv=None):
         _append_cv_metrics("gin", res_gin)
     except Exception as e:
         print("gin train_cv failed:", e)
+
+    if bool(getattr(cli_flags, "save_pretrained", False)):
+        pretrained_dir = os.path.abspath(str(getattr(cli_flags, "pretrained_dir", getattr(cfg, "BASELINE_SAVE_DIR", os.path.join("save", "baseline")))))
+        os.makedirs(pretrained_dir, exist_ok=True)
+        for name, info in trained.items():
+            src_paths = [p for p in (info.get("paths") or []) if isinstance(p, str) and os.path.isfile(p)]
+            if not src_paths:
+                continue
+            dst_dir = os.path.join(pretrained_dir, str(name))
+            if os.path.isdir(dst_dir):
+                shutil.rmtree(dst_dir)
+            os.makedirs(dst_dir, exist_ok=True)
+            for src in src_paths:
+                shutil.copy2(src, os.path.join(dst_dir, os.path.basename(src)))
+        print(f"[INFO] Saved baseline pre-trained checkpoints to: {pretrained_dir}")
 
     all_results = []
     for name in VECTOR_BACKBONES:
