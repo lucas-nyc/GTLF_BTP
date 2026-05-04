@@ -199,6 +199,17 @@ def _parse_args(argv=None):
         action="store_true",
         help="When visualization is selected without --visualization-args, do not auto-generate default plots.",
     )
+    parser.add_argument("--eval-only", action="store_true", help="Evaluate supported pre-trained model tasks instead of training.")
+    parser.add_argument(
+        "--baseline-save-dir",
+        default=None,
+        help="Pre-trained baseline checkpoint directory. Default comes from config.BASELINE_SAVE_DIR.",
+    )
+    parser.add_argument(
+        "--gtlf-save-dir",
+        default=None,
+        help="Pre-trained GTLF checkpoint directory. Default comes from config.GTLF_SAVE_DIR.",
+    )
     return parser.parse_args(argv)
 
 
@@ -211,10 +222,22 @@ def main(argv=None):
     stats_output_dir = None
 
     if "baseline" in tasks:
-        baseline_run = _run_baseline(args.baseline_args)
+        baseline_args = args.baseline_args
+        if bool(args.eval_only):
+            extra = ["--eval-only"]
+            if args.baseline_save_dir:
+                extra.extend(["--pretrained-dir", str(args.baseline_save_dir)])
+            baseline_args = " ".join([baseline_args, *extra]).strip()
+        baseline_run = _run_baseline(baseline_args)
 
     if "fusion" in tasks:
-        fusion_run = _run_fusion(args.fusion_args)
+        fusion_args = args.fusion_args
+        if bool(args.eval_only):
+            extra = ["--eval-only"]
+            if args.gtlf_save_dir:
+                extra.extend(["--pretrained-dir", str(args.gtlf_save_dir)])
+            fusion_args = " ".join([fusion_args, *extra]).strip()
+        fusion_run = _run_fusion(fusion_args)
 
     if "stats" in tasks:
         _run_stats(
